@@ -1,6 +1,8 @@
 package com.example.flickfind.ui.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -24,9 +26,17 @@ fun SearchScreen(
     val searchResults by viewModel.searchResults.collectAsState()
     val popularMovies by viewModel.popularMovies.collectAsState()
     val watchlist by viewModel.watchlist.collectAsState()
+    val genres by viewModel.genres.collectAsState()
+    val selectedGenreId by viewModel.selectedGenreId.collectAsState()
 
-    // Hiển thị kết quả tìm kiếm nếu có query, ngược lại hiển thị phim phổ biến làm gợi ý
-    val displayMovies = if (query.isBlank()) popularMovies else searchResults
+    // Lọc theo genre ở client
+    val baseMovies = if (query.isBlank()) popularMovies else searchResults
+    val displayMovies = if (selectedGenreId != null) {
+        baseMovies.filter { it.genreIds?.contains(selectedGenreId) == true }
+    } else {
+        baseMovies
+    }
+    
     val title = if (query.isBlank()) "Gợi ý phim hot" else "Kết quả tìm kiếm"
 
     SearchContent(
@@ -38,6 +48,9 @@ fun SearchScreen(
         displayMovies = displayMovies,
         title = title,
         watchlist = watchlist,
+        genres = genres,
+        selectedGenreId = selectedGenreId,
+        onGenreClick = { viewModel.selectGenre(if (selectedGenreId == it) null else it) },
         onMovieClick = onMovieClick,
         onWatchlistClick = { viewModel.toggleWatchlist(it) }
     )
@@ -51,6 +64,9 @@ fun SearchContent(
     displayMovies: List<Movie>,
     title: String,
     watchlist: List<com.example.flickfind.data.local.MovieEntity>,
+    genres: List<com.example.flickfind.data.model.Genre>,
+    selectedGenreId: Int?,
+    onGenreClick: (Int) -> Unit,
     onMovieClick: (Movie) -> Unit,
     onWatchlistClick: (Movie) -> Unit
 ) {
@@ -65,6 +81,22 @@ fun SearchContent(
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
             singleLine = true
         )
+
+        if (genres.isNotEmpty()) {
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                items(genres) { genre ->
+                    FilterChip(
+                        selected = selectedGenreId == genre.id,
+                        onClick = { onGenreClick(genre.id) },
+                        label = { Text(genre.name) }
+                    )
+                }
+            }
+        }
 
         if (displayMovies.isNotEmpty()) {
             Text(
@@ -106,6 +138,9 @@ fun SearchScreenPreview() {
         displayMovies = mockMovies,
         title = "Kết quả tìm kiếm",
         watchlist = emptyList(),
+        genres = emptyList(),
+        selectedGenreId = null,
+        onGenreClick = {},
         onMovieClick = {},
         onWatchlistClick = {}
     )

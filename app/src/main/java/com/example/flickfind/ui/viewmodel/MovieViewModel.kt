@@ -4,12 +4,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.flickfind.data.local.MovieEntity
+import com.example.flickfind.data.model.Genre
 import com.example.flickfind.data.model.Movie
 import com.example.flickfind.data.repository.MovieRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -23,6 +25,12 @@ class MovieViewModel(private val repository: MovieRepository) : ViewModel() {
 
     private val _searchResults = MutableStateFlow<List<Movie>>(emptyList())
     val searchResults: StateFlow<List<Movie>> = _searchResults.asStateFlow()
+
+    private val _genres = MutableStateFlow<List<Genre>>(emptyList())
+    val genres: StateFlow<List<Genre>> = _genres.asStateFlow()
+
+    private val _selectedGenreId = MutableStateFlow<Int?>(null)
+    val selectedGenreId: StateFlow<Int?> = _selectedGenreId.asStateFlow()
 
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
@@ -46,13 +54,33 @@ class MovieViewModel(private val repository: MovieRepository) : ViewModel() {
     private val _isLoadingDetail = MutableStateFlow(false)
     val isLoadingDetail: StateFlow<Boolean> = _isLoadingDetail.asStateFlow()
 
+    // isRefreshing = true khi đang tải nowPlaying hoặc popular
+    val isRefreshing: StateFlow<Boolean> = combine(_isLoadingNowPlaying, _isLoadingPopular) { a, b -> a || b }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
     init {
         refreshAll()
+        fetchGenres()
     }
 
     fun refreshAll() {
         fetchNowPlaying()
         fetchPopular()
+    }
+
+    private fun fetchGenres() {
+        viewModelScope.launch {
+            try {
+                val results = repository.getGenres()
+                _genres.value = results
+            } catch (e: Exception) {
+                android.util.Log.e("MovieViewModel", "Error fetching genres: ${e.message}", e)
+            }
+        }
+    }
+
+    fun selectGenre(genreId: Int?) {
+        _selectedGenreId.value = genreId
     }
 
     fun fetchNowPlaying() {
@@ -94,7 +122,12 @@ class MovieViewModel(private val repository: MovieRepository) : ViewModel() {
             if (query.isBlank()) {
                 _searchResults.value = emptyList()
             } else {
-                _searchResults.value = repository.searchMovies(query)
+                try {
+                    _searchResults.value = repository.searchMovies(query)
+                } catch (e: Exception) {
+                    android.util.Log.e("MovieViewModel", "Error searching: ${e.message}", e)
+                    _searchResults.value = emptyList()
+                }
             }
         }
     }
@@ -123,10 +156,10 @@ class MovieViewModel(private val repository: MovieRepository) : ViewModel() {
             _errorMessage.value = null
             try {
                 val movie = repository.getMovieDetails(movieId)
-                if (movie != null && (movie.overview.isNullOrBlank())) {
+                if (movie.overview.isNullOrBlank()) {
                     // Nếu không có mô tả tiếng Việt, thử lấy bản tiếng Anh
                     val englishMovie = repository.getMovieDetails(movieId, "en-US")
-                    _selectedMovie.value = movie.copy(overview = englishMovie?.overview)
+                    _selectedMovie.value = movie.copy(overview = englishMovie.overview)
                 } else {
                     _selectedMovie.value = movie
                 }

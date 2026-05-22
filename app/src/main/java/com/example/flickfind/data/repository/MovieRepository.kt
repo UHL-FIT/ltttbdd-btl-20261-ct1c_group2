@@ -2,6 +2,7 @@ package com.example.flickfind.data.repository
 
 import com.example.flickfind.data.local.MovieDao
 import com.example.flickfind.data.local.MovieEntity
+import com.example.flickfind.data.model.Genre
 import com.example.flickfind.data.model.Movie
 import com.example.flickfind.data.remote.TMDBApiService
 import kotlinx.coroutines.flow.Flow
@@ -10,7 +11,8 @@ class MovieRepository(
     private val apiService: TMDBApiService,
     private val movieDao: MovieDao
 ) {
-    private val apiKey = "MÃ_API_KEY_CỦA_BẠN"
+    // TODO: Thay "YOUR_TMDB_API_KEY" bằng API key thật của bạn từ https://www.themoviedb.org/settings/api
+    private val apiKey = "75f9cffbe89e18a68c1be474e807b372"
     private val language = "vi-VN"
 
     suspend fun getNowPlaying(): List<Movie> {
@@ -25,7 +27,11 @@ class MovieRepository(
         return apiService.searchMovies(apiKey, query, language).results
     }
 
-    suspend fun getMovieDetails(movieId: Int, lang: String = language): Movie? {
+    suspend fun getGenres(): List<Genre> {
+        return apiService.getGenres(apiKey, language).genres
+    }
+
+    suspend fun getMovieDetails(movieId: Int, lang: String = language): Movie {
         return apiService.getMovieDetails(movieId, apiKey, lang)
     }
 
