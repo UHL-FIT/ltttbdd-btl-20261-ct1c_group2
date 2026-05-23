@@ -8,10 +8,10 @@
             <InsightsFilterSettings>
               <option name="connection">
                 <ConnectionSetting>
-                  <option name="appId" value="PLACEHOLDER" />
-                  <option name="mobileSdkAppId" value="" />
-                  <option name="projectId" value="" />
-                  <option name="projectNumber" value="" />
+                  <option name="appId" value="com.example.flickfind" />
+                  <option name="mobileSdkAppId" value="1:825560457136:android:55d924177ff90cf23ac075" />
+                  <option name="projectId" value="flickfind-aa5d3" />
+                  <option name="projectNumber" value="825560457136" />
                 </ConnectionSetting>
               </option>
               <option name="signal" value="SIGNAL_UNSPECIFIED" />

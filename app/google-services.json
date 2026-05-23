@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "825560457136",
+    "project_id": "flickfind-aa5d3",
+    "storage_bucket": "flickfind-aa5d3.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:825560457136:android:14f163b98c0797dd3ac075",
+        "android_client_info": {
+          "package_name": "com.example.duantest_baitaplon"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCya_9tDgDEiBcjKM51Y-jygs8moFZ97Qg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:825560457136:android:55d924177ff90cf23ac075",
+        "android_client_info": {
+          "package_name": "com.example.flickfind"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCya_9tDgDEiBcjKM51Y-jygs8moFZ97Qg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
