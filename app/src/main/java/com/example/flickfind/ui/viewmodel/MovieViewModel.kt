@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.flickfind.data.local.MovieEntity
 import com.example.flickfind.data.model.Genre
 import com.example.flickfind.data.model.Movie
+import com.example.flickfind.data.model.Video
 import com.example.flickfind.data.repository.MovieRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -14,6 +15,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.asStateFlow
+import android.util.Log
 
 class MovieViewModel(private val repository: MovieRepository) : ViewModel() {
 
@@ -50,6 +55,9 @@ class MovieViewModel(private val repository: MovieRepository) : ViewModel() {
 
     private val _selectedMovie = MutableStateFlow<Movie?>(null)
     val selectedMovie: StateFlow<Movie?> = _selectedMovie.asStateFlow()
+
+    private val _movieVideos = MutableStateFlow<List<Video>>(emptyList())
+    val movieVideos: StateFlow<List<Video>> = _movieVideos.asStateFlow()
 
     private val _isLoadingDetail = MutableStateFlow(false)
     val isLoadingDetail: StateFlow<Boolean> = _isLoadingDetail.asStateFlow()
@@ -163,6 +171,15 @@ class MovieViewModel(private val repository: MovieRepository) : ViewModel() {
                 } else {
                     _selectedMovie.value = movie
                 }
+                
+                // Fetch videos after fetching movie details
+                try {
+                    _movieVideos.value = repository.getMovieVideos(movieId)
+                } catch (e: Exception) {
+                    android.util.Log.e("MovieViewModel", "Error fetching videos: ${e.message}", e)
+                    _movieVideos.value = emptyList()
+                }
+                
             } catch (e: Exception) {
                 android.util.Log.e("MovieViewModel", "Error fetching movie details: ${e.message}", e)
                 _errorMessage.value = "Không thể tải chi tiết phim: ${e.message}"
@@ -174,6 +191,7 @@ class MovieViewModel(private val repository: MovieRepository) : ViewModel() {
 
     fun clearSelectedMovie() {
         _selectedMovie.value = null
+        _movieVideos.value = emptyList()
     }
 }
 

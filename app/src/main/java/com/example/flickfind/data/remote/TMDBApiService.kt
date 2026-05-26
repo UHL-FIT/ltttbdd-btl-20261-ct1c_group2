@@ -3,6 +3,7 @@ package com.example.flickfind.data.remote
 import com.example.flickfind.data.model.GenreResponse
 import com.example.flickfind.data.model.Movie
 import com.example.flickfind.data.model.MovieResponse
+import com.example.flickfind.data.model.VideoResponse
 import retrofit2.http.GET
 import retrofit2.http.Path
 import retrofit2.http.Query
@@ -37,6 +38,13 @@ interface TMDBApiService {
         @Query("language") language: String = "vi-VN",
         @Query("append_to_response") appendToResponse: String = "credits"
     ): Movie
+
+    @GET("movie/{movie_id}/videos")
+    suspend fun getMovieVideos(
+        @Path("movie_id") movieId: Int,
+        @Query("api_key") apiKey: String,
+        @Query("language") language: String = "en-US" // Thường trailer TMDB có tiếng Anh đầy đủ hơn
+    ): VideoResponse
 
     @GET("genre/movie/list")
     suspend fun getGenres(

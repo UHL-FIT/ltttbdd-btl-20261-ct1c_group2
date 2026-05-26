@@ -20,4 +20,10 @@ interface MovieDao {
 
     @Query("SELECT EXISTS(SELECT 1 FROM watchlist WHERE id = :movieId)")
     suspend fun isInWatchlist(movieId: Int): Boolean
+
+    @Query("SELECT * FROM cached_videos WHERE movieId = :movieId")
+    suspend fun getCachedVideos(movieId: Int): CachedVideoEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCachedVideos(entity: CachedVideoEntity)
 }

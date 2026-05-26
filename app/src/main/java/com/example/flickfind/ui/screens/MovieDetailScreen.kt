@@ -1,5 +1,6 @@
 package com.example.flickfind.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -11,6 +12,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.flickfind.data.model.Movie
+import com.example.flickfind.data.model.Video
 import com.example.flickfind.ui.viewmodel.MovieViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -34,9 +37,13 @@ fun MovieDetailScreen(
     onBackClick: () -> Unit
 ) {
     val movie by viewModel.selectedMovie.collectAsState()
+    val videos by viewModel.movieVideos.collectAsState()
     val isLoading by viewModel.isLoadingDetail.collectAsState()
     val watchlist by viewModel.watchlist.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
+    
+    var selectedVideoKey by remember { mutableStateOf<String?>(null) }
+    var showAllTrailers by remember { mutableStateOf(false) }
 
     LaunchedEffect(movieId) {
         viewModel.fetchMovieDetails(movieId)
@@ -85,7 +92,12 @@ fun MovieDetailScreen(
                     }
                 }
             } else if (movie != null) {
-                MovieDetailContent(movie!!)
+                MovieDetailContent(
+                    movie = movie!!,
+                    videos = videos,
+                    onPlayVideo = { key -> selectedVideoKey = key },
+                    onShowAllTrailers = { showAllTrailers = true }
+                )
             } else {
                 Text(
                     text = "Không tìm thấy thông tin phim",
@@ -94,10 +106,48 @@ fun MovieDetailScreen(
             }
         }
     }
+    
+    // Video Player Dialog
+    if (selectedVideoKey != null) {
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = { selectedVideoKey = null },
+            properties = androidx.compose.ui.window.DialogProperties(
+                usePlatformDefaultWidth = false,
+                dismissOnBackPress = true,
+                dismissOnClickOutside = true
+            )
+        ) {
+            VideoPlayerDialog(
+                videoKey = selectedVideoKey!!,
+                onDismiss = { selectedVideoKey = null }
+            )
+        }
+    }
+    
+    // Bottom Sheet for all trailers
+    if (showAllTrailers) {
+        ModalBottomSheet(onDismissRequest = { showAllTrailers = false }) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("Tất cả Trailers & Teasers", style = MaterialTheme.typography.titleLarge)
+                Spacer(modifier = Modifier.height(16.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    items(videos) { video ->
+                        VideoThumbnail(video = video, onClick = { selectedVideoKey = video.key })
+                    }
+                }
+                Spacer(modifier = Modifier.height(32.dp))
+            }
+        }
+    }
 }
 
 @Composable
-fun MovieDetailContent(movie: Movie) {
+fun MovieDetailContent(
+    movie: Movie,
+    videos: List<Video> = emptyList(),
+    onPlayVideo: (String) -> Unit = {},
+    onShowAllTrailers: () -> Unit = {}
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -154,6 +204,33 @@ fun MovieDetailContent(movie: Movie) {
                 style = MaterialTheme.typography.bodyLarge,
                 lineHeight = 24.sp
             )
+            
+            // Trailers Section
+            if (videos.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(24.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Trailers & Teasers",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    if (videos.size > 3) {
+                        TextButton(onClick = onShowAllTrailers) {
+                            Text("Xem thêm")
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    items(videos.take(3)) { video ->
+                        VideoThumbnail(video = video, onClick = { onPlayVideo(video.key) })
+                    }
+                }
+            }
 
             if (!movie.credits?.cast.isNullOrEmpty()) {
                 Spacer(modifier = Modifier.height(16.dp))
@@ -235,5 +312,66 @@ fun MovieDetailContent(movie: Movie) {
                 }
             }
         }
+    }
+}
+
+@Composable
+fun VideoThumbnail(video: Video, onClick: () -> Unit) {
+    Column(modifier = Modifier.width(200.dp)) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(16f / 9f)
+                .clip(MaterialTheme.shapes.medium),
+            contentAlignment = Alignment.Center
+        ) {
+            AsyncImage(
+                model = video.thumbnailUrl,
+                contentDescription = video.name,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+                placeholder = androidx.compose.ui.res.painterResource(id = android.R.drawable.ic_menu_report_image),
+                error = androidx.compose.ui.res.painterResource(id = android.R.drawable.ic_menu_report_image)
+            )
+            
+            // Overlay gradient
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.3f))
+            )
+            
+            // Play Icon
+            IconButton(onClick = onClick) {
+                Icon(
+                    imageVector = Icons.Default.PlayArrow,
+                    contentDescription = "Play Trailer",
+                    tint = Color.White,
+                    modifier = Modifier.size(48.dp)
+                )
+            }
+            
+            // Badge
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(8.dp)
+                    .background(MaterialTheme.colorScheme.primary, MaterialTheme.shapes.small)
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = video.type,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    style = MaterialTheme.typography.labelSmall
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = video.name,
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = 2,
+            modifier = Modifier.padding(horizontal = 4.dp)
+        )
     }
 }

@@ -57,3 +57,27 @@ data class MovieResponse(
     val page: Int = 1,
     @SerializedName("total_pages") val totalPages: Int = 1
 )
+
+data class Video(
+    val id: String,
+    @SerializedName("iso_639_1") val language: String?,
+    val key: String,
+    val name: String,
+    val site: String,
+    val type: String,
+    val official: Boolean
+) {
+    val isYouTube: Boolean
+        get() = site.equals("YouTube", ignoreCase = true)
+        
+    val isTrailerOrTeaser: Boolean
+        get() = type.equals("Trailer", ignoreCase = true) || type.equals("Teaser", ignoreCase = true)
+        
+    val thumbnailUrl: String
+        get() = "https://img.youtube.com/vi/$key/hqdefault.jpg"
+}
+
+data class VideoResponse(
+    val id: Int,
+    val results: List<Video>
+)
