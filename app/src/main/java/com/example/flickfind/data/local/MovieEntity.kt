@@ -1,17 +1,18 @@
 package com.example.flickfind.data.local
 
 import androidx.room.Entity
-import androidx.room.PrimaryKey
 import com.example.flickfind.data.model.Movie
 
-@Entity(tableName = "watchlist")
+@Entity(tableName = "watchlist", primaryKeys = ["id", "userId"])
 data class MovieEntity(
-    @PrimaryKey val id: Int,
-    val title: String,
-    val posterPath: String?,
-    val voteAverage: Double?,
-    val releaseDate: String?,
-    val overview: String?
+    val id: Int = 0,
+    val userId: String = "",
+    val title: String = "",
+    val posterPath: String? = null,
+    val voteAverage: Double? = 0.0,
+    val releaseDate: String? = "",
+    val overview: String? = "",
+    val isWatched: Boolean = false
 ) {
     fun toMovie(): Movie {
         return Movie(

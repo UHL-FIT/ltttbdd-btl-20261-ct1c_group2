@@ -29,12 +29,15 @@ import com.example.flickfind.data.model.Movie
 import com.example.flickfind.data.model.Video
 import com.example.flickfind.ui.viewmodel.MovieViewModel
 
+import com.google.firebase.auth.FirebaseAuth
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MovieDetailScreen(
     movieId: Int,
     viewModel: MovieViewModel,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    onLoginRequired: () -> Unit
 ) {
     val movie by viewModel.selectedMovie.collectAsState()
     val videos by viewModel.movieVideos.collectAsState()
@@ -44,6 +47,17 @@ fun MovieDetailScreen(
     
     var selectedVideoKey by remember { mutableStateOf<String?>(null) }
     var showAllTrailers by remember { mutableStateOf(false) }
+    var showLoginDialog by remember { mutableStateOf(false) }
+
+    if (showLoginDialog) {
+        LoginRequiredDialog(
+            onDismiss = { showLoginDialog = false },
+            onConfirm = {
+                showLoginDialog = false
+                onLoginRequired()
+            }
+        )
+    }
 
     LaunchedEffect(movieId) {
         viewModel.fetchMovieDetails(movieId)
@@ -61,7 +75,13 @@ fun MovieDetailScreen(
                 actions = {
                     movie?.let { currentMovie ->
                         val isFavorite = watchlist.any { it.id == currentMovie.id }
-                        IconButton(onClick = { viewModel.toggleWatchlist(currentMovie) }) {
+                        IconButton(onClick = { 
+                            if (FirebaseAuth.getInstance().currentUser == null) {
+                                showLoginDialog = true
+                            } else {
+                                viewModel.toggleWatchlist(currentMovie)
+                            }
+                        }) {
                             Icon(
                                 imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                                 contentDescription = "Yêu thích",

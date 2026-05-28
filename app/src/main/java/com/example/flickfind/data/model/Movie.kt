@@ -11,7 +11,8 @@ data class Movie(
     val overview: String?,
     @SerializedName("genre_ids") val genreIds: List<Int>? = null,
     @SerializedName("production_companies") val productionCompanies: List<ProductionCompany>? = null,
-    val credits: CreditsResponse? = null
+    val credits: CreditsResponse? = null,
+    val reviews: ReviewResponse? = null
 ) {
     val fullPosterUrl: String?
         get() = posterPath?.let { "https://image.tmdb.org/t/p/w500$it" }

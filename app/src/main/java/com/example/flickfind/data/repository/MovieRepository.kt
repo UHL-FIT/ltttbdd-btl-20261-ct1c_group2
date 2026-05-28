@@ -1,6 +1,9 @@
 package com.example.flickfind.data.repository
 
+import android.content.Context
+import androidx.work.*
 import com.example.flickfind.data.local.CachedVideoEntity
+import com.example.flickfind.data.local.CachedMovieEntity
 import com.example.flickfind.data.local.MovieDao
 import com.example.flickfind.data.local.MovieEntity
 import com.example.flickfind.data.model.Genre
@@ -8,40 +11,86 @@ import com.example.flickfind.data.model.Movie
 import com.example.flickfind.data.model.Video
 import com.example.flickfind.data.model.VideoResponse
 import com.example.flickfind.data.remote.TMDBApiService
+import com.example.flickfind.worker.MovieNotificationWorker
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import com.google.gson.Gson
 import kotlinx.coroutines.flow.Flow
-import android.util.Log
+import kotlinx.coroutines.tasks.await
+import java.text.SimpleDateFormat
+import java.util.*
+import java.util.concurrent.TimeUnit
 
 class MovieRepository(
     private val apiService: TMDBApiService,
     private val movieDao: MovieDao,
+    private val context: Context
 ) {
-    // TODO: Thay "YOUR_TMDB_API_KEY" bằng API key thật của bạn từ https://www.themoviedb.org/settings/api
     private val apiKey = "75f9cffbe89e18a68c1be474e807b372"
     private val language = "vi-VN"
+    private val firestore = FirebaseFirestore.getInstance()
+    private val auth = FirebaseAuth.getInstance()
 
     suspend fun getNowPlaying(): List<Movie> {
-        return apiService.getNowPlaying(apiKey, language).results
+        return try {
+            val remoteMovies = apiService.getNowPlaying(apiKey, language).results
+            // Cập nhật cache
+            movieDao.clearCacheByCategory("now_playing")
+            movieDao.insertCachedMovies(remoteMovies.map { it.toCachedEntity("now_playing") })
+            remoteMovies
+        } catch (e: Exception) {
+            android.util.Log.e("MovieRepository", "Offline Mode: Fetching Now Playing from Cache", e)
+            movieDao.getCachedMovies("now_playing").map { it.toMovie() }
+        }
     }
 
     suspend fun getPopular(): List<Movie> {
-        return apiService.getPopular(apiKey, language).results
-        val startTime = System.currentTimeMillis()
-        Log.d("PERF_TEST", "START_API_GET_POPULAR: $startTime") // Log thời điểm bắt đầu request
+        return try {
+            val remoteMovies = apiService.getPopular(apiKey, language).results
+            // Cập nhật cache
+            movieDao.clearCacheByCategory("popular")
+            movieDao.insertCachedMovies(remoteMovies.map { it.toCachedEntity("popular") })
+            remoteMovies
+        } catch (e: Exception) {
+            android.util.Log.e("MovieRepository", "Offline Mode: Fetching Popular from Cache", e)
+            movieDao.getCachedMovies("popular").map { it.toMovie() }
+        }
+    }
 
-        // Giả định apiService.getPopular trả về một đối tượng có thuộc tính 'results' là List<Movie>
-        val movies = apiService.getPopular(apiKey, language).results
-
-        val endTime = System.currentTimeMillis()
-        val duration = endTime - startTime
-        Log.d("PERF_TEST", "END_API_GET_POPULAR: $endTime")   // Log thời điểm kết thúc request
-        Log.d("PERF_TEST", "LOAD_TIME_POPULAR: ${duration}ms") // Log tổng thời gian
-
-        return movies
+    private fun Movie.toCachedEntity(category: String): CachedMovieEntity {
+        return CachedMovieEntity(
+            id = id,
+            title = title,
+            posterPath = posterPath,
+            voteAverage = voteAverage,
+            releaseDate = releaseDate,
+            overview = overview,
+            category = category
+        )
     }
 
     suspend fun searchMovies(query: String): List<Movie> {
-        return apiService.searchMovies(apiKey, query, language).results
+        val category = "search:$query"
+        val currentTime = System.currentTimeMillis()
+        val threshold = currentTime - (24 * 60 * 60 * 1000L) // 24 giờ trước
+
+        // Dọn dẹp cache tìm kiếm cũ để giải phóng bộ nhớ
+        try {
+            movieDao.deleteOldSearchCache(threshold)
+        } catch (e: Exception) {
+            android.util.Log.e("MovieRepository", "Error cleaning old search cache", e)
+        }
+
+        return try {
+            val remoteMovies = apiService.searchMovies(apiKey, query, language).results
+            // Cập nhật cache cho kết quả tìm kiếm
+            movieDao.clearCacheByCategory(category)
+            movieDao.insertCachedMovies(remoteMovies.map { it.toCachedEntity(category) })
+            remoteMovies
+        } catch (e: Exception) {
+            android.util.Log.e("MovieRepository", "Offline Mode: Fetching Search Results for '$query' from Cache", e)
+            movieDao.getCachedMovies(category).map { it.toMovie() }
+        }
     }
 
     suspend fun getGenres(): List<Genre> {
@@ -88,26 +137,170 @@ class MovieRepository(
         }
     }
 
-    val watchlist: Flow<List<MovieEntity>> = movieDao.getAllWatchlist()
+    fun getWatchlist(userId: String): Flow<List<MovieEntity>> = movieDao.getAllWatchlist(userId)
 
     suspend fun addToWatchlist(movie: Movie) {
-        movieDao.addToWatchlist(
-            MovieEntity(
-                id = movie.id,
-                title = movie.title,
-                posterPath = movie.posterPath,
-                voteAverage = movie.voteAverage,
-                releaseDate = movie.releaseDate,
-                overview = movie.overview
-            )
+        val currentUser = auth.currentUser ?: return
+        val entity = MovieEntity(
+            id = movie.id,
+            userId = currentUser.uid,
+            title = movie.title,
+            posterPath = movie.posterPath,
+            voteAverage = movie.voteAverage,
+            releaseDate = movie.releaseDate,
+            overview = movie.overview
         )
+        movieDao.addToWatchlist(entity)
+        triggerWatchlistSync() // Đảm bảo đồng bộ lên Cloud
+        scheduleReleaseNotification(movie)
+    }
+
+    private fun triggerWatchlistSync() {
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+
+        val syncRequest = OneTimeWorkRequestBuilder<com.example.flickfind.worker.WatchlistSyncWorker>()
+            .setConstraints(constraints)
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 1, TimeUnit.MINUTES)
+            .build()
+
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            "watchlist_sync",
+            ExistingWorkPolicy.REPLACE,
+            syncRequest
+        )
+    }
+
+    private fun scheduleReleaseNotification(movie: Movie) {
+        val releaseDateStr = movie.releaseDate ?: return
+        if (releaseDateStr.isBlank()) return
+
+        try {
+            val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+            val releaseDate = sdf.parse(releaseDateStr) ?: return
+            val currentTime = System.currentTimeMillis()
+
+            // Nếu ngày công chiếu trong tương lai hoặc là hôm nay (trong vòng 24h tới)
+            if (releaseDate.time > currentTime - 86400000) { 
+                val delay = Math.max(0L, releaseDate.time - currentTime)
+                val data = Data.Builder()
+                    .putString("movie_title", movie.title)
+                    .putInt("movie_id", movie.id)
+                    .build()
+
+                val notificationRequest = OneTimeWorkRequestBuilder<MovieNotificationWorker>()
+                    .setInitialDelay(delay, TimeUnit.MILLISECONDS)
+                    .setInputData(data)
+                    .addTag("movie_${movie.id}")
+                    .build()
+
+                WorkManager.getInstance(context).enqueueUniqueWork(
+                    "notification_${movie.id}",
+                    ExistingWorkPolicy.REPLACE,
+                    notificationRequest
+                )
+                android.util.Log.d("MovieRepository", "Scheduled notification for ${movie.title} with delay $delay ms")
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("MovieRepository", "Notification Error: ${e.message}")
+        }
     }
 
     suspend fun removeFromWatchlist(movie: MovieEntity) {
         movieDao.removeFromWatchlist(movie)
+        // Xóa trên Cloud thông qua SyncWorker hoặc xóa trực tiếp nếu có mạng
+        auth.currentUser?.let { user ->
+            firestore.collection("users").document(user.uid)
+                .collection("watchlist").document(movie.id.toString()).delete()
+        }
+        triggerWatchlistSync() // Chạy sync để đảm bảo tính nhất quán
+    }
+
+    suspend fun updateWatchedStatus(movieId: Int, isWatched: Boolean) {
+        val userId = auth.currentUser?.uid ?: return
+        movieDao.updateWatchedStatus(movieId, userId, isWatched)
+        // Đồng bộ lên Firestore ngay lập tức
+        try {
+            firestore.collection("users").document(userId)
+                .collection("watchlist").document(movieId.toString())
+                .update("isWatched", isWatched).await()
+        } catch (e: Exception) {
+            android.util.Log.e("MovieRepository", "Update Watched Status Error: ${e.message}")
+        }
+        // Kích hoạt Worker để đảm bảo tính nhất quán nếu update trực tiếp thất bại
+        triggerWatchlistSync()
+    }
+
+    suspend fun syncWatchlistFromFirestore() {
+        val currentUser = auth.currentUser ?: return
+        try {
+            val snapshot = firestore.collection("users").document(currentUser.uid)
+                .collection("watchlist").get().await()
+            
+            val remoteMovies = snapshot.documents.mapNotNull { doc ->
+                doc.toObject(MovieEntity::class.java)?.copy(userId = currentUser.uid)
+            }
+
+            // 1. Lấy toàn bộ danh sách local một lần duy nhất để tối ưu hiệu năng
+            val localMovies = movieDao.getAllWatchlistSync(currentUser.uid)
+
+            // 2. Cập nhật hoặc thêm mới từ Cloud vào Local
+            for (remoteMovie in remoteMovies) {
+                val localMovie = localMovies.find { it.id == remoteMovie.id }
+                
+                if (localMovie != null) {
+                    // Merge trạng thái isWatched: ưu tiên true (đã xem)
+                    val mergedIsWatched = localMovie.isWatched || remoteMovie.isWatched
+                    if (localMovie.isWatched != mergedIsWatched) {
+                        movieDao.updateWatchedStatus(remoteMovie.id, currentUser.uid, mergedIsWatched)
+                    }
+                } else {
+                    movieDao.addToWatchlist(remoteMovie)
+                }
+                scheduleReleaseNotification(remoteMovie.toMovie())
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("MovieRepository", "Firestore Sync Error: ${e.message}")
+        }
+    }
+
+    private fun MovieEntity.toMovie(): Movie {
+        return Movie(
+            id = id,
+            title = title,
+            posterPath = posterPath,
+            voteAverage = voteAverage,
+            releaseDate = releaseDate,
+            overview = overview
+        )
     }
 
     suspend fun isInWatchlist(movieId: Int): Boolean {
-        return movieDao.isInWatchlist(movieId)
+        val userId = auth.currentUser?.uid ?: return false
+        return movieDao.isInWatchlist(movieId, userId)
+    }
+
+    // Search History methods
+    fun getSearchHistory(userId: String): Flow<List<com.example.flickfind.data.local.SearchHistoryEntity>> = 
+        movieDao.getRecentSearchQueries(userId)
+
+    suspend fun addSearchQuery(query: String) {
+        val userId = auth.currentUser?.uid ?: "guest"
+        if (query.isNotBlank()) {
+            movieDao.insertSearchQuery(com.example.flickfind.data.local.SearchHistoryEntity(query, userId))
+            // Chỉ giữ lại 20 mục lịch sử gần nhất cho mỗi user
+            movieDao.trimSearchHistory(userId, 20)
+        }
+    }
+
+    suspend fun deleteSearchQuery(query: String) {
+        val userId = auth.currentUser?.uid ?: "guest"
+        movieDao.deleteSearchQuery(query, userId)
+    }
+
+    suspend fun clearSearchHistory() {
+        val userId = auth.currentUser?.uid ?: "guest"
+        movieDao.clearSearchHistory(userId)
     }
 }

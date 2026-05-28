@@ -7,6 +7,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -26,8 +28,10 @@ import com.example.flickfind.data.model.Movie
 fun MovieCard(
     movie: Movie,
     isFavorite: Boolean = false,
+    isWatched: Boolean = false,
     onMovieClick: (Movie) -> Unit,
-    onWatchlistClick: (Movie) -> Unit
+    onWatchlistClick: (Movie) -> Unit,
+    onWatchedClick: ((Boolean) -> Unit)? = null
 ) {
     Card(
         modifier = Modifier
@@ -50,17 +54,43 @@ fun MovieCard(
                     error = androidx.compose.ui.res.painterResource(id = android.R.drawable.ic_menu_report_image)
                 )
                 
-                IconButton(
-                    onClick = { onWatchlistClick(movie) },
+                Row(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(4.dp)
                 ) {
-                    Icon(
-                        imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                        contentDescription = "Watchlist",
-                        tint = if (isFavorite) Color.Red else Color.White
-                    )
+                    if (onWatchedClick != null) {
+                        IconButton(
+                            onClick = { onWatchedClick(!isWatched) },
+                            colors = IconButtonDefaults.iconButtonColors(
+                                containerColor = Color.Black.copy(alpha = 0.5f)
+                            ),
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (isWatched) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                contentDescription = "Mark as watched",
+                                tint = if (isWatched) Color.Green else Color.White,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(4.dp))
+                    }
+                    
+                    IconButton(
+                        onClick = { onWatchlistClick(movie) },
+                        colors = IconButtonDefaults.iconButtonColors(
+                            containerColor = Color.Black.copy(alpha = 0.5f)
+                        ),
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                            contentDescription = "Watchlist",
+                            tint = if (isFavorite) Color.Red else Color.White,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
                 }
 
                 Surface(
@@ -101,6 +131,28 @@ fun MovieCard(
             )
         }
     }
+}
+
+@Composable
+fun LoginRequiredDialog(
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Yêu cầu đăng nhập") },
+        text = { Text("Vui lòng đăng nhập để sử dụng tính năng này và lưu phim vào mục yêu thích của bạn.") },
+        confirmButton = {
+            Button(onClick = onConfirm) {
+                Text("Đăng nhập")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Hủy")
+            }
+        }
+    )
 }
 
 @Preview(showBackground = true)

@@ -5,7 +5,16 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [MovieEntity::class, CachedVideoEntity::class], version = 8, exportSchema = false)
+@Database(
+    entities = [
+        MovieEntity::class,
+        CachedVideoEntity::class,
+        CachedMovieEntity::class,
+        SearchHistoryEntity::class
+    ],
+    version = 15,
+    exportSchema = false
+)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun movieDao(): MovieDao
 

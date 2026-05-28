@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.flickfind.data.local.MovieEntity
+import com.example.flickfind.data.local.SearchHistoryEntity
 import com.example.flickfind.data.model.Genre
 import com.example.flickfind.data.model.Movie
 import com.example.flickfind.data.model.Video
@@ -15,12 +16,14 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import androidx.lifecycle.viewModelScope
+
+import kotlinx.coroutines.Job
+import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.flow.asStateFlow
-import android.util.Log
 
 class MovieViewModel(private val repository: MovieRepository) : ViewModel() {
+    private var watchlistJob: Job? = null
 
     private val _nowPlayingMovies = MutableStateFlow<List<Movie>>(emptyList())
     val nowPlayingMovies: StateFlow<List<Movie>> = _nowPlayingMovies.asStateFlow()
@@ -40,12 +43,11 @@ class MovieViewModel(private val repository: MovieRepository) : ViewModel() {
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
-    val watchlist: StateFlow<List<MovieEntity>> = repository.watchlist
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
+    private val _watchlist = MutableStateFlow<List<MovieEntity>>(emptyList())
+    val watchlist: StateFlow<List<MovieEntity>> = _watchlist.asStateFlow()
+
+    private val _searchHistory = MutableStateFlow<List<SearchHistoryEntity>>(emptyList())
+    val searchHistory: StateFlow<List<SearchHistoryEntity>> = _searchHistory.asStateFlow()
 
     private val _isLoadingNowPlaying = MutableStateFlow(false)
     val isLoadingNowPlaying: StateFlow<Boolean> = _isLoadingNowPlaying.asStateFlow()
@@ -62,6 +64,12 @@ class MovieViewModel(private val repository: MovieRepository) : ViewModel() {
     private val _isLoadingDetail = MutableStateFlow(false)
     val isLoadingDetail: StateFlow<Boolean> = _isLoadingDetail.asStateFlow()
 
+    private val _isLoadingSearch = MutableStateFlow(false)
+    val isLoadingSearch: StateFlow<Boolean> = _isLoadingSearch.asStateFlow()
+
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+
     // isRefreshing = true khi đang tải nowPlaying hoặc popular
     val isRefreshing: StateFlow<Boolean> = combine(_isLoadingNowPlaying, _isLoadingPopular) { a, b -> a || b }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
@@ -69,6 +77,50 @@ class MovieViewModel(private val repository: MovieRepository) : ViewModel() {
     init {
         refreshAll()
         fetchGenres()
+    }
+
+    fun loadWatchlistForUser(uid: String?) {
+        watchlistJob?.cancel()
+        if (uid != null) {
+            watchlistJob = viewModelScope.launch {
+                // Tự động đồng bộ từ cloud khi người dùng thay đổi
+                repository.syncWatchlistFromFirestore()
+                
+                // Thu thập Watchlist
+                launch {
+                    repository.getWatchlist(uid).collectLatest {
+                        _watchlist.value = it
+                    }
+                }
+
+                // Thu thập Lịch sử tìm kiếm
+                launch {
+                    repository.getSearchHistory(uid).collectLatest {
+                        _searchHistory.value = it
+                    }
+                }
+            }
+        } else {
+            _watchlist.value = emptyList()
+            // Đối với guest, có thể lấy lịch sử mặc định "guest"
+            watchlistJob = viewModelScope.launch {
+                repository.getSearchHistory("guest").collectLatest {
+                    _searchHistory.value = it
+                }
+            }
+        }
+    }
+
+    fun syncFromCloud() {
+        viewModelScope.launch {
+            val uid = FirebaseAuth.getInstance().currentUser?.uid
+            if (uid != null) {
+                _isLoadingNowPlaying.value = true
+                repository.syncWatchlistFromFirestore()
+                loadWatchlistForUser(uid)
+                _isLoadingNowPlaying.value = false
+            }
+        }
     }
 
     fun refreshAll() {
@@ -125,18 +177,53 @@ class MovieViewModel(private val repository: MovieRepository) : ViewModel() {
         }
     }
 
-    fun searchMovies(query: String) {
-        viewModelScope.launch {
+    private var searchJob: Job? = null
+
+    fun searchMovies(query: String, saveToHistory: Boolean = false) {
+        // Nếu query giống hệt query cũ và đã có kết quả, không cần search lại (trừ khi cần lưu history)
+        if (_searchQuery.value == query && _searchResults.value.isNotEmpty() && !saveToHistory) return
+        
+        _searchQuery.value = query
+        searchJob?.cancel()
+        searchJob = viewModelScope.launch {
             if (query.isBlank()) {
                 _searchResults.value = emptyList()
             } else {
                 try {
-                    _searchResults.value = repository.searchMovies(query)
+                    _isLoadingSearch.value = true
+                    val results = repository.searchMovies(query)
+                    _searchResults.value = results
+                    if (saveToHistory) {
+                        addSearchQuery(query)
+                    }
                 } catch (e: Exception) {
-                    android.util.Log.e("MovieViewModel", "Error searching: ${e.message}", e)
-                    _searchResults.value = emptyList()
+                    if (e !is kotlinx.coroutines.CancellationException) {
+                        android.util.Log.e("MovieViewModel", "Error searching: ${e.message}", e)
+                        _searchResults.value = emptyList()
+                    }
+                } finally {
+                    _isLoadingSearch.value = false
                 }
             }
+        }
+    }
+
+    fun addSearchQuery(query: String) {
+        if (query.isBlank()) return
+        viewModelScope.launch {
+            repository.addSearchQuery(query.trim())
+        }
+    }
+
+    fun deleteSearchQuery(query: String) {
+        viewModelScope.launch {
+            repository.deleteSearchQuery(query)
+        }
+    }
+
+    fun clearSearchHistory() {
+        viewModelScope.launch {
+            repository.clearSearchHistory()
         }
     }
 
@@ -149,6 +236,12 @@ class MovieViewModel(private val repository: MovieRepository) : ViewModel() {
             } else {
                 repository.addToWatchlist(movie)
             }
+        }
+    }
+
+    fun updateWatchedStatus(movieId: Int, isWatched: Boolean) {
+        viewModelScope.launch {
+            repository.updateWatchedStatus(movieId, isWatched)
         }
     }
 
