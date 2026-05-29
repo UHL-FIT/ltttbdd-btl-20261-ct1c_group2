@@ -112,12 +112,15 @@ fun MainScreen(viewModel: MovieViewModel, authViewModel: AuthViewModel) {
                             label = { Text(screen.title) },
                             selected = currentDestination?.route == screen.route,
                             onClick = {
-                                navController.navigate(screen.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) {
-                                        saveState = true
+                                val popped = navController.popBackStack(screen.route, inclusive = false)
+                                if (!popped) {
+                                    navController.navigate(screen.route) {
+                                        popUpTo(navController.graph.findStartDestination().id) {
+                                            saveState = true
+                                        }
+                                        launchSingleTop = true
+                                        restoreState = true
                                     }
-                                    launchSingleTop = true
-                                    restoreState = true
                                 }
                             }
                         )
@@ -168,16 +171,28 @@ fun MainScreen(viewModel: MovieViewModel, authViewModel: AuthViewModel) {
                         }
                     },
                     onNavigateToEditProfile = { navController.navigate("edit_profile") },
-                    onNavigateToWatchlist = { navController.navigate(Screen.Watchlist.route) },
+                    onNavigateToWatchlist = { 
+                        navController.navigate(Screen.Watchlist.route) {
+                            launchSingleTop = true
+                        }
+                    },
                     onLoginClick = { navController.navigate("login") },
                     onNavigateToSearch = {
                         navController.navigate(Screen.Search.route)
+                    },
+                    onNavigateToAbout = {
+                        navController.navigate("about")
                     }
                 )
             }
             composable("edit_profile") {
                 EditProfileScreen(
                     viewModel = authViewModel,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+            composable("about") {
+                AboutScreen(
                     onNavigateBack = { navController.popBackStack() }
                 )
             }

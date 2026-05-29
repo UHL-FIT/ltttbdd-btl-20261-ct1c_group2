@@ -16,9 +16,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import android.content.res.Configuration
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
@@ -27,6 +29,8 @@ fun VideoPlayerDialog(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
     Box(
         modifier = Modifier
@@ -49,10 +53,17 @@ fun VideoPlayerDialog(
 
             Box(
                 modifier = Modifier
+                    .weight(1f)
                     .fillMaxWidth()
-                    .aspectRatio(16f / 9f)
-                    .padding(horizontal = 8.dp)
+                    .padding(horizontal = 8.dp),
+                contentAlignment = Alignment.Center
             ) {
+                val videoModifier = if (isLandscape) {
+                    Modifier.fillMaxHeight().aspectRatio(16f / 9f)
+                } else {
+                    Modifier.fillMaxWidth().aspectRatio(16f / 9f)
+                }
+
                 AndroidView(
                     factory = { ctx ->
                         WebView(ctx).apply {
@@ -61,22 +72,28 @@ fun VideoPlayerDialog(
                             settings.mediaPlaybackRequiresUserGesture = false
                             webChromeClient = WebChromeClient()
                             webViewClient = object : WebViewClient() {
+                                private fun handleUrl(url: String): Boolean {
+                                    if (!url.startsWith("http://") && !url.startsWith("https://")) {
+                                        return true // Chặn intent://, vnd.youtube:,... để không văng sang app ngoài
+                                    }
+                                    return false // Cho phép http/https load bình thường
+                                }
+
                                 override fun shouldOverrideUrlLoading(
                                     view: WebView?,
                                     request: WebResourceRequest?
                                 ): Boolean {
-                                    // Mở url ngoài (ví dụ bấm vào logo youtube) bằng external app thay vì load trong webview
                                     val url = request?.url?.toString() ?: return false
-                                    if (url.startsWith("intent://") || url.startsWith("https://www.youtube.com/watch")) {
-                                        try {
-                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                                            ctx.startActivity(intent)
-                                            return true
-                                        } catch (e: Exception) {
-                                            // Ignore
-                                        }
-                                    }
-                                    return false
+                                    return handleUrl(url)
+                                }
+
+                                @Deprecated("Deprecated in Java")
+                                override fun shouldOverrideUrlLoading(
+                                    view: WebView?,
+                                    url: String?
+                                ): Boolean {
+                                    val urlStr = url ?: return false
+                                    return handleUrl(urlStr)
                                 }
                             }
                             
@@ -97,11 +114,11 @@ fun VideoPlayerDialog(
                             loadDataWithBaseURL("https://www.youtube.com", videoHtml, "text/html", "UTF-8", null)
                         }
                     },
-                    modifier = Modifier.fillMaxSize()
+                    modifier = videoModifier
                 )
             }
             
-            Spacer(modifier = Modifier.weight(1f))
+
             
             Button(
                 onClick = {
@@ -116,7 +133,7 @@ fun VideoPlayerDialog(
                 },
                 modifier = Modifier
                     .align(Alignment.CenterHorizontally)
-                    .padding(bottom = 32.dp),
+                    .padding(vertical = 16.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
             ) {
                 Text("Mở bằng ứng dụng YouTube")

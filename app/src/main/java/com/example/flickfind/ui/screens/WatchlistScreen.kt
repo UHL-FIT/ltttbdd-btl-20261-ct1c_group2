@@ -10,6 +10,7 @@ import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -26,8 +27,7 @@ import com.google.firebase.auth.FirebaseAuth
 enum class SortOption(val title: String) {
     DEFAULT("Mới thêm"),
     RATING("Điểm cao"),
-    RELEASE_DATE("Ngày ra mắt"),
-    TITLE("Tên A-Z")
+    RELEASE_DATE("Ngày ra mắt")
 }
 
 @Composable
@@ -101,14 +101,16 @@ fun WatchlistContent(
         }
     } else {
         var showSuggestDialog by remember { mutableStateOf(false) }
-        var currentSortOption by remember { mutableStateOf(SortOption.DEFAULT) }
+        var currentSortOption by rememberSaveable { mutableStateOf(SortOption.DEFAULT) }
         
-        val sortedWatchlist = remember(watchlist, currentSortOption) {
-            when (currentSortOption) {
-                SortOption.DEFAULT -> watchlist.reversed() // Mới nhất lên đầu
-                SortOption.RATING -> watchlist.sortedByDescending { it.voteAverage ?: 0.0 }
-                SortOption.RELEASE_DATE -> watchlist.sortedByDescending { it.releaseDate ?: "" }
-                SortOption.TITLE -> watchlist.sortedBy { it.title }
+        val watchlistState = rememberUpdatedState(watchlist)
+        val sortedWatchlist by remember {
+            derivedStateOf {
+                when (currentSortOption) {
+                    SortOption.DEFAULT -> watchlistState.value.reversed() // Mới nhất lên đầu
+                    SortOption.RATING -> watchlistState.value.sortedByDescending { it.voteAverage ?: 0.0 }
+                    SortOption.RELEASE_DATE -> watchlistState.value.sortedByDescending { it.releaseDate ?: "" }
+                }
             }
         }
 

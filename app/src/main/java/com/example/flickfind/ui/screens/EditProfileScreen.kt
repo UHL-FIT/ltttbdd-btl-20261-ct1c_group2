@@ -1,6 +1,9 @@
 package com.example.flickfind.ui.screens
 
 import android.net.Uri
+import androidx.compose.ui.platform.LocalContext
+import java.io.File
+import java.io.FileOutputStream
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -154,8 +157,25 @@ fun EditProfileScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
+            val context = LocalContext.current
             Button(
-                onClick = { viewModel.updateProfile(displayName, selectedImageUri) },
+                onClick = { 
+                    var finalUri = selectedImageUri
+                    if (finalUri != null && finalUri.toString().startsWith("content://")) {
+                        try {
+                            val inputStream = context.contentResolver.openInputStream(finalUri)
+                            val file = File(context.filesDir, "avatar_${user?.uid ?: "local"}.jpg")
+                            val outputStream = FileOutputStream(file)
+                            inputStream?.copyTo(outputStream)
+                            inputStream?.close()
+                            outputStream.close()
+                            finalUri = Uri.fromFile(file)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+                    viewModel.updateProfile(displayName, finalUri) 
+                },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !isLoading
             ) {

@@ -13,7 +13,7 @@ import com.example.flickfind.data.model.VideoResponse
 import com.example.flickfind.data.remote.TMDBApiService
 import com.example.flickfind.worker.MovieNotificationWorker
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
+
 import com.google.gson.Gson
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.tasks.await
@@ -28,7 +28,7 @@ class MovieRepository(
 ) {
     private val apiKey = "75f9cffbe89e18a68c1be474e807b372"
     private val language = "vi-VN"
-    private val firestore = FirebaseFirestore.getInstance()
+
     private val auth = FirebaseAuth.getInstance()
 
     suspend fun getNowPlaying(): List<Movie> {
@@ -151,26 +151,11 @@ class MovieRepository(
             overview = movie.overview
         )
         movieDao.addToWatchlist(entity)
-        triggerWatchlistSync() // Đảm bảo đồng bộ lên Cloud
+
         scheduleReleaseNotification(movie)
     }
 
-    private fun triggerWatchlistSync() {
-        val constraints = Constraints.Builder()
-            .setRequiredNetworkType(NetworkType.CONNECTED)
-            .build()
 
-        val syncRequest = OneTimeWorkRequestBuilder<com.example.flickfind.worker.WatchlistSyncWorker>()
-            .setConstraints(constraints)
-            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 1, TimeUnit.MINUTES)
-            .build()
-
-        WorkManager.getInstance(context).enqueueUniqueWork(
-            "watchlist_sync",
-            ExistingWorkPolicy.REPLACE,
-            syncRequest
-        )
-    }
 
     private fun scheduleReleaseNotification(movie: Movie) {
         val releaseDateStr = movie.releaseDate ?: return
@@ -209,61 +194,14 @@ class MovieRepository(
 
     suspend fun removeFromWatchlist(movie: MovieEntity) {
         movieDao.removeFromWatchlist(movie)
-        // Xóa trên Cloud thông qua SyncWorker hoặc xóa trực tiếp nếu có mạng
-        auth.currentUser?.let { user ->
-            firestore.collection("users").document(user.uid)
-                .collection("watchlist").document(movie.id.toString()).delete()
-        }
-        triggerWatchlistSync() // Chạy sync để đảm bảo tính nhất quán
     }
 
     suspend fun updateWatchedStatus(movieId: Int, isWatched: Boolean) {
         val userId = auth.currentUser?.uid ?: return
         movieDao.updateWatchedStatus(movieId, userId, isWatched)
-        // Đồng bộ lên Firestore ngay lập tức
-        try {
-            firestore.collection("users").document(userId)
-                .collection("watchlist").document(movieId.toString())
-                .update("isWatched", isWatched).await()
-        } catch (e: Exception) {
-            android.util.Log.e("MovieRepository", "Update Watched Status Error: ${e.message}")
-        }
-        // Kích hoạt Worker để đảm bảo tính nhất quán nếu update trực tiếp thất bại
-        triggerWatchlistSync()
     }
 
-    suspend fun syncWatchlistFromFirestore() {
-        val currentUser = auth.currentUser ?: return
-        try {
-            val snapshot = firestore.collection("users").document(currentUser.uid)
-                .collection("watchlist").get().await()
-            
-            val remoteMovies = snapshot.documents.mapNotNull { doc ->
-                doc.toObject(MovieEntity::class.java)?.copy(userId = currentUser.uid)
-            }
 
-            // 1. Lấy toàn bộ danh sách local một lần duy nhất để tối ưu hiệu năng
-            val localMovies = movieDao.getAllWatchlistSync(currentUser.uid)
-
-            // 2. Cập nhật hoặc thêm mới từ Cloud vào Local
-            for (remoteMovie in remoteMovies) {
-                val localMovie = localMovies.find { it.id == remoteMovie.id }
-                
-                if (localMovie != null) {
-                    // Merge trạng thái isWatched: ưu tiên true (đã xem)
-                    val mergedIsWatched = localMovie.isWatched || remoteMovie.isWatched
-                    if (localMovie.isWatched != mergedIsWatched) {
-                        movieDao.updateWatchedStatus(remoteMovie.id, currentUser.uid, mergedIsWatched)
-                    }
-                } else {
-                    movieDao.addToWatchlist(remoteMovie)
-                }
-                scheduleReleaseNotification(remoteMovie.toMovie())
-            }
-        } catch (e: Exception) {
-            android.util.Log.e("MovieRepository", "Firestore Sync Error: ${e.message}")
-        }
-    }
 
     private fun MovieEntity.toMovie(): Movie {
         return Movie(

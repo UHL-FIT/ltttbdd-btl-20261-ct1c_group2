@@ -29,7 +29,8 @@ fun ProfileScreen(
     onNavigateToEditProfile: () -> Unit,
     onLoginClick: () -> Unit,
     onNavigateToWatchlist: () -> Unit = {},
-    onNavigateToSearch: () -> Unit = {}
+    onNavigateToSearch: () -> Unit = {},
+    onNavigateToAbout: () -> Unit = {}
 ) {
     val user by authViewModel.user.collectAsState()
     val watchlist by movieViewModel.watchlist.collectAsState()
@@ -123,18 +124,7 @@ fun ProfileScreen(
             Spacer(modifier = Modifier.height(32.dp))
 
             // Các mục chức năng
-            ProfileMenuItem(
-                icon = Icons.Default.CloudDownload,
-                title = "Đồng bộ từ Đám mây",
-                onClick = { movieViewModel.syncFromCloud() }
-            )
-            Text(
-                text = "Mẹo: Sử dụng tính năng này để khôi phục danh sách phim yêu thích của bạn từ tài khoản Cloud.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-            )
+
             ProfileMenuItem(
                 icon = Icons.Default.Edit,
                 title = "Chỉnh sửa cá nhân",
@@ -153,7 +143,7 @@ fun ProfileScreen(
             ProfileMenuItem(
                 icon = Icons.Default.Info,
                 title = "Về FlickFind",
-                onClick = { }
+                onClick = onNavigateToAbout
             )
 
             Spacer(modifier = Modifier.height(32.dp))
@@ -173,7 +163,8 @@ fun ProfileScreen(
             }
             
             Text(
-                text = "Phiên bản 1.0.0",
+                text = "Một sản phẩm của nhóm sinh viên\" +\n" +
+                        "\"KHOA CNTT TRƯỜNG ĐẠI HỌC HẠ LONG\"",
                 modifier = Modifier.padding(top = 16.dp),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.outline

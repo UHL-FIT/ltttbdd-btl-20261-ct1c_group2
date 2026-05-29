@@ -83,8 +83,7 @@ class MovieViewModel(private val repository: MovieRepository) : ViewModel() {
         watchlistJob?.cancel()
         if (uid != null) {
             watchlistJob = viewModelScope.launch {
-                // Tự động đồng bộ từ cloud khi người dùng thay đổi
-                repository.syncWatchlistFromFirestore()
+
                 
                 // Thu thập Watchlist
                 launch {
@@ -111,17 +110,7 @@ class MovieViewModel(private val repository: MovieRepository) : ViewModel() {
         }
     }
 
-    fun syncFromCloud() {
-        viewModelScope.launch {
-            val uid = FirebaseAuth.getInstance().currentUser?.uid
-            if (uid != null) {
-                _isLoadingNowPlaying.value = true
-                repository.syncWatchlistFromFirestore()
-                loadWatchlistForUser(uid)
-                _isLoadingNowPlaying.value = false
-            }
-        }
-    }
+
 
     fun refreshAll() {
         fetchNowPlaying()
