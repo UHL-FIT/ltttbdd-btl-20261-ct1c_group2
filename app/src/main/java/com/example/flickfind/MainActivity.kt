@@ -155,27 +155,21 @@ fun MainScreen(viewModel: MovieViewModel, authViewModel: AuthViewModel) {
             composable(Screen.Watchlist.route) { 
                 WatchlistScreen(
                     viewModel = viewModel,
-                    onMovieClick = { movie ->
+                    onMovieClick = { movie -> 
                         navController.navigate("detail/${movie.id}")
                     },
                     onLoginClick = { navController.navigate("login") }
                 ) 
             }
-            composable("profile") {
+            composable(Screen.Profile.route) { 
                 ProfileScreen(
                     authViewModel = authViewModel,
                     movieViewModel = viewModel,
-                    onLogout = { 
-                        navController.navigate(Screen.Home.route) {
-                            popUpTo(0)
-                        }
+                    onLogout = {
+                        navController.popBackStack()
                     },
                     onNavigateToEditProfile = { navController.navigate("edit_profile") },
-                    onNavigateToWatchlist = { 
-                        navController.navigate(Screen.Watchlist.route) {
-                            launchSingleTop = true
-                        }
-                    },
+                    onNavigateToWatchlist = { navController.navigate(Screen.Watchlist.route) },
                     onLoginClick = { navController.navigate("login") },
                     onNavigateToSearch = {
                         navController.navigate(Screen.Search.route)

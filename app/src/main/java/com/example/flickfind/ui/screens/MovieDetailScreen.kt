@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -13,6 +14,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,11 +26,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.flickfind.data.model.Movie
 import com.example.flickfind.data.model.Video
+import com.example.flickfind.data.repository.ReviewRepository
+import com.example.flickfind.ui.viewmodel.MovieReviewViewModel
+import com.example.flickfind.ui.viewmodel.MovieReviewViewModelFactory
 import com.example.flickfind.ui.viewmodel.MovieViewModel
-
 import com.google.firebase.auth.FirebaseAuth
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -112,11 +117,109 @@ fun MovieDetailScreen(
                     }
                 }
             } else if (movie != null) {
+                // Initialize Review ViewModel
+                val reviewViewModel: MovieReviewViewModel = viewModel(
+                    factory = MovieReviewViewModelFactory(ReviewRepository())
+                )
+                // Observe state flows
+                val ratingStats by reviewViewModel.ratingStats.collectAsState()
+                val userRating by reviewViewModel.userRating.collectAsState()
+                val commentList by reviewViewModel.comments.collectAsState()
+                val repliesMap by reviewViewModel.replies.collectAsState()
+                val isUserLoggedIn = FirebaseAuth.getInstance().currentUser != null
+
+                // Set movie ID for review data
+                LaunchedEffect(movieId) {
+                    reviewViewModel.setMovieId(movieId.toString())
+                }
+
                 MovieDetailContent(
                     movie = movie!!,
                     videos = videos,
                     onPlayVideo = { key -> selectedVideoKey = key },
-                    onShowAllTrailers = { showAllTrailers = true }
+                    onShowAllTrailers = { showAllTrailers = true },
+                    ratingSection = {
+                        RatingSection(
+                            averageRating = ratingStats.first,
+                            breakdown = ratingStats.second,
+                            userRating = userRating,
+                            onRatingSubmit = { rating -> reviewViewModel.submitRating(rating) },
+                            isUserLoggedIn = isUserLoggedIn,
+                            onLoginRequired = { showLoginDialog = true }
+                        )
+                    },
+                    commentsSection = {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                text = "Bình luận (${commentList.size})",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            
+                            // Comment Input Field for new comments
+                            var newCommentText by remember { mutableStateOf("") }
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                OutlinedTextField(
+                                    value = newCommentText,
+                                    onValueChange = { newCommentText = it },
+                                    placeholder = { Text("Viết bình luận của bạn...") },
+                                    modifier = Modifier.weight(1f).padding(end = 8.dp),
+                                    shape = RoundedCornerShape(24.dp),
+                                    singleLine = true
+                                )
+                                IconButton(
+                                    onClick = {
+                                        if (newCommentText.isNotBlank()) {
+                                            if (!isUserLoggedIn) {
+                                                showLoginDialog = true
+                                            } else {
+                                                reviewViewModel.submitComment(newCommentText)
+                                                newCommentText = ""
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier.size(48.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Send,
+                                        contentDescription = "Gửi bình luận",
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+
+                            if (commentList.isEmpty()) {
+                                Text(
+                                    text = "Chưa có bình luận nào. Hãy là người đầu tiên bình luận!",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = Color.Gray,
+                                    modifier = Modifier.padding(vertical = 16.dp)
+                                )
+                            } else {
+                                commentList.forEach { comment ->
+                                    CommentItem(
+                                        comment = comment,
+                                        replies = repliesMap[comment.id] ?: emptyList(),
+                                        currentUserId = FirebaseAuth.getInstance().currentUser?.uid,
+                                        onLikeClick = { reviewViewModel.toggleLikeComment(comment.id) },
+                                        onDeleteClick = { reviewViewModel.deleteComment(comment.id, comment.parentId) },
+                                        onReplySubmit = { replyText -> reviewViewModel.submitReply(comment.id, replyText) },
+                                        onLoadReplies = { reviewViewModel.loadReplies(comment.id) },
+                                        isUserLoggedIn = isUserLoggedIn,
+                                        onLoginRequired = { showLoginDialog = true }
+                                    )
+                                    HorizontalDivider(
+                                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                                        modifier = Modifier.padding(vertical = 4.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
                 )
             } else {
                 Text(
@@ -166,7 +269,9 @@ fun MovieDetailContent(
     movie: Movie,
     videos: List<Video> = emptyList(),
     onPlayVideo: (String) -> Unit = {},
-    onShowAllTrailers: () -> Unit = {}
+    onShowAllTrailers: () -> Unit = {},
+    ratingSection: @Composable () -> Unit = {},
+    commentsSection: @Composable () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -331,6 +436,12 @@ fun MovieDetailContent(
                     }
                 }
             }
+            
+            Spacer(modifier = Modifier.height(24.dp))
+            ratingSection()
+            Spacer(modifier = Modifier.height(24.dp))
+            commentsSection()
+            Spacer(modifier = Modifier.height(32.dp))
         }
     }
 }

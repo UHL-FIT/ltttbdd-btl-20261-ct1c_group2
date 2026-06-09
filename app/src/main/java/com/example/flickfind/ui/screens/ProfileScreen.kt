@@ -163,9 +163,9 @@ fun ProfileScreen(
             }
             
             Text(
-                text = "Một sản phẩm của nhóm sinh viên\" +\n" +
-                        "\"KHOA CNTT TRƯỜNG ĐẠI HỌC HẠ LONG\"",
-                modifier = Modifier.padding(top = 16.dp),
+                text = "Một sản phẩm của nhóm sinh viên \n" +
+                        "KHOA CNTT TRƯỜNG ĐẠI HỌC HẠ LONG",
+                modifier = Modifier.padding(top = 16.dp).align(Alignment.CenterHorizontally),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.outline
             )
