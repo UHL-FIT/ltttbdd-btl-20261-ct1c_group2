@@ -44,12 +44,32 @@ fun MovieDetailScreen(
     onBackClick: () -> Unit,
     onLoginRequired: () -> Unit
 ) {
+    if (movieId <= 0) {
+        // Invalid movie ID, show error UI
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(text = "Movie not found.", color = MaterialTheme.colorScheme.error)
+        }
+        return
+    }
     val movie by viewModel.selectedMovie.collectAsState()
     val videos by viewModel.movieVideos.collectAsState()
     val isLoading by viewModel.isLoadingDetail.collectAsState()
     val watchlist by viewModel.watchlist.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
     
+    // Initialize Review ViewModel at the top level (not inside conditional blocks)
+    val reviewViewModel: MovieReviewViewModel = viewModel(
+        factory = MovieReviewViewModelFactory(ReviewRepository())
+    )
+    val ratingStats by reviewViewModel.ratingStats.collectAsState()
+    val userRating by reviewViewModel.userRating.collectAsState()
+    val commentList by reviewViewModel.comments.collectAsState()
+    val repliesMap by reviewViewModel.replies.collectAsState()
+    
+    val currentUser = FirebaseAuth.getInstance().currentUser
+    val isUserLoggedIn = currentUser != null
+    val currentUserId = currentUser?.uid
+
     var selectedVideoKey by remember { mutableStateOf<String?>(null) }
     var showAllTrailers by remember { mutableStateOf(false) }
     var showLoginDialog by remember { mutableStateOf(false) }
@@ -66,6 +86,12 @@ fun MovieDetailScreen(
 
     LaunchedEffect(movieId) {
         viewModel.fetchMovieDetails(movieId)
+    }
+    
+    // Always call setMovieId when movieId or user changes
+    // Use currentUserId as key so it re-triggers on login/logout/account switch
+    LaunchedEffect(movieId, currentUserId) {
+        reviewViewModel.setMovieId(movieId.toString())
     }
 
     Scaffold(
@@ -117,38 +143,26 @@ fun MovieDetailScreen(
                     }
                 }
             } else if (movie != null) {
-                // Initialize Review ViewModel
-                val reviewViewModel: MovieReviewViewModel = viewModel(
-                    factory = MovieReviewViewModelFactory(ReviewRepository())
-                )
-                // Observe state flows
-                val ratingStats by reviewViewModel.ratingStats.collectAsState()
-                val userRating by reviewViewModel.userRating.collectAsState()
-                val commentList by reviewViewModel.comments.collectAsState()
-                val repliesMap by reviewViewModel.replies.collectAsState()
-                val isUserLoggedIn = FirebaseAuth.getInstance().currentUser != null
 
-                // Set movie ID for review data
-                LaunchedEffect(movieId) {
-                    reviewViewModel.setMovieId(movieId.toString())
-                }
+                Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                    MovieDetailContent(
+                        movie = movie!!,
+                        videos = videos,
+                        onPlayVideo = { key -> selectedVideoKey = key },
+                        onShowAllTrailers = { showAllTrailers = true }
+                    )
 
-                MovieDetailContent(
-                    movie = movie!!,
-                    videos = videos,
-                    onPlayVideo = { key -> selectedVideoKey = key },
-                    onShowAllTrailers = { showAllTrailers = true },
-                    ratingSection = {
+                    Column(modifier = Modifier.padding(16.dp)) {
                         RatingSection(
                             averageRating = ratingStats.first,
                             breakdown = ratingStats.second,
                             userRating = userRating,
                             onRatingSubmit = { rating -> reviewViewModel.submitRating(rating) },
-                            isUserLoggedIn = isUserLoggedIn,
-                            onLoginRequired = { showLoginDialog = true }
+                            isUserLoggedIn = isUserLoggedIn
                         )
-                    },
-                    commentsSection = {
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
                         Column(modifier = Modifier.fillMaxWidth()) {
                             Text(
                                 text = "Bình luận (${commentList.size})",
@@ -204,7 +218,7 @@ fun MovieDetailScreen(
                                     CommentItem(
                                         comment = comment,
                                         replies = repliesMap[comment.id] ?: emptyList(),
-                                        currentUserId = FirebaseAuth.getInstance().currentUser?.uid,
+                                        currentUserId = currentUserId,
                                         onLikeClick = { reviewViewModel.toggleLikeComment(comment.id) },
                                         onDeleteClick = { reviewViewModel.deleteComment(comment.id, comment.parentId) },
                                         onReplySubmit = { replyText -> reviewViewModel.submitReply(comment.id, replyText) },
@@ -220,7 +234,7 @@ fun MovieDetailScreen(
                             }
                         }
                     }
-                )
+                }
             } else {
                 Text(
                     text = "Không tìm thấy thông tin phim",
@@ -276,7 +290,6 @@ fun MovieDetailContent(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
     ) {
         AsyncImage(
             model = movie.fullPosterUrl,

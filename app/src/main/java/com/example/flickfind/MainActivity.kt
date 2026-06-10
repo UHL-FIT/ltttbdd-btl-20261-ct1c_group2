@@ -152,6 +152,17 @@ fun MainScreen(viewModel: MovieViewModel, authViewModel: AuthViewModel) {
                     onLoginRequired = { navController.navigate("login") }
                 ) 
             }
+            composable("search_history") { 
+                SearchHistoryScreen(
+                    viewModel = viewModel,
+                    onHistoryClick = { query ->
+                        viewModel.selectGenre(null)
+                        viewModel.searchMovies(query, saveToHistory = true)
+                        navController.navigate(Screen.Search.route)
+                    },
+                    onDeleteHistory = { viewModel.deleteSearchQuery(it) }
+                )
+            }
             composable(Screen.Watchlist.route) { 
                 WatchlistScreen(
                     viewModel = viewModel,

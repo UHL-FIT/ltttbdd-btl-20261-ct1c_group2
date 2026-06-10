@@ -1,5 +1,6 @@
 package com.example.flickfind.data.repository
 
+import android.util.Log
 import com.example.flickfind.data.model.MovieComment
 import com.example.flickfind.data.model.MovieRating
 import com.google.firebase.auth.FirebaseAuth
@@ -32,7 +33,7 @@ class ReviewRepository {
         val docRef = firestore.collection("movie_ratings").document("${movieId}_${userId}")
         val listener = docRef.addSnapshotListener { snapshot, error ->
             if (error != null) {
-                close(error)
+                Log.e("ReviewRepository", "getUserRating error", error)
                 return@addSnapshotListener
             }
             if (snapshot != null && snapshot.exists()) {
@@ -50,7 +51,7 @@ class ReviewRepository {
             .whereEqualTo("movieId", movieId)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    close(error)
+                    Log.e("ReviewRepository", "getRatingStats error", error)
                     return@addSnapshotListener
                 }
                 if (snapshot != null) {
@@ -77,7 +78,7 @@ class ReviewRepository {
             .whereEqualTo("parentId", null)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    close(error)
+                    Log.e("ReviewRepository", "getComments error", error)
                     return@addSnapshotListener
                 }
                 if (snapshot != null) {
@@ -95,7 +96,7 @@ class ReviewRepository {
             .whereEqualTo("parentId", parentId)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    close(error)
+                    Log.e("ReviewRepository", "getReplies error", error)
                     return@addSnapshotListener
                 }
                 if (snapshot != null) {

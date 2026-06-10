@@ -45,13 +45,11 @@ class MovieReviewViewModel(private val repository: ReviewRepository) : ViewModel
     private val replyJobs = mutableMapOf<String, Job>()
 
     fun setMovieId(id: String) {
-        if (_movieId.value == id) return
-        _movieId.value = id
+        // Always cancel and restart listeners to ensure fresh data
+        // This handles: new movie, account switch, or re-navigation
+        cancelAllListeners()
         
-        // Cancel previous listeners
-        activeMovieJobs.forEach { it.cancel() }
-        replyJobs.values.forEach { it.cancel() }
-        replyJobs.clear()
+        _movieId.value = id
         _replies.value = emptyMap()
         _userRating.value = null
         _ratingStats.value = 0.0 to emptyMap()
@@ -59,25 +57,41 @@ class MovieReviewViewModel(private val repository: ReviewRepository) : ViewModel
 
         if (id.isBlank()) return
 
+        startListeners(id)
+    }
+
+    private fun cancelAllListeners() {
+        activeMovieJobs.forEach { it.cancel() }
+        replyJobs.values.forEach { it.cancel() }
+        replyJobs.clear()
+    }
+
+    private fun startListeners(id: String) {
         // Start listening to Firestore flows
         val jobStats = viewModelScope.launch {
-            repository.getRatingStats(id).collect {
-                _ratingStats.value = it
-            }
+            repository.getRatingStats(id)
+                .catch { e -> e.printStackTrace() }
+                .collect {
+                    _ratingStats.value = it
+                }
         }
 
         val jobComments = viewModelScope.launch {
-            repository.getComments(id).collect {
-                _rawComments.value = it
-            }
+            repository.getComments(id)
+                .catch { e -> e.printStackTrace() }
+                .collect {
+                    _rawComments.value = it
+                }
         }
 
         val jobUserRating = viewModelScope.launch {
             val userId = auth.currentUser?.uid
             if (userId != null) {
-                repository.getUserRating(id, userId).collect {
-                    _userRating.value = it
-                }
+                repository.getUserRating(id, userId)
+                    .catch { e -> e.printStackTrace() }
+                    .collect {
+                        _userRating.value = it
+                    }
             } else {
                 _userRating.value = null
             }
@@ -91,11 +105,13 @@ class MovieReviewViewModel(private val repository: ReviewRepository) : ViewModel
         if (replyJobs.containsKey(parentId)) return // Already listening
 
         val job = viewModelScope.launch {
-            repository.getReplies(parentId).collect { replyList ->
-                val currentReplies = _replies.value.toMutableMap()
-                currentReplies[parentId] = replyList.sortedBy { it.createdAt }
-                _replies.value = currentReplies
-            }
+            repository.getReplies(parentId)
+                .catch { e -> e.printStackTrace() }
+                .collect { replyList ->
+                    val currentReplies = _replies.value.toMutableMap()
+                    currentReplies[parentId] = replyList.sortedBy { it.createdAt }
+                    _replies.value = currentReplies
+                }
         }
         replyJobs[parentId] = job
     }
@@ -103,7 +119,11 @@ class MovieReviewViewModel(private val repository: ReviewRepository) : ViewModel
     fun submitRating(rating: Int) {
         val currentMovieId = _movieId.value ?: return
         viewModelScope.launch {
-            repository.submitRating(currentMovieId, rating)
+            try {
+                repository.submitRating(currentMovieId, rating)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
@@ -111,7 +131,11 @@ class MovieReviewViewModel(private val repository: ReviewRepository) : ViewModel
         val currentMovieId = _movieId.value ?: return
         if (content.isBlank()) return
         viewModelScope.launch {
-            repository.addComment(currentMovieId, content)
+            try {
+                repository.addComment(currentMovieId, content)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
@@ -119,20 +143,32 @@ class MovieReviewViewModel(private val repository: ReviewRepository) : ViewModel
         val currentMovieId = _movieId.value ?: return
         if (content.isBlank()) return
         viewModelScope.launch {
-            repository.addReply(currentMovieId, parentId, content)
+            try {
+                repository.addReply(currentMovieId, parentId, content)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
     fun deleteComment(commentId: String, parentId: String? = null) {
         viewModelScope.launch {
-            repository.deleteComment(commentId, parentId)
+            try {
+                repository.deleteComment(commentId, parentId)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
     fun toggleLikeComment(commentId: String) {
         val userId = auth.currentUser?.uid ?: return
         viewModelScope.launch {
-            repository.toggleLikeComment(commentId, userId)
+            try {
+                repository.toggleLikeComment(commentId, userId)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 

@@ -57,7 +57,6 @@ fun RatingSection(
     userRating: Int?,
     onRatingSubmit: (Int) -> Unit,
     isUserLoggedIn: Boolean,
-    onLoginRequired: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val totalRatings = breakdown.values.sum()
@@ -154,42 +153,45 @@ fun RatingSection(
             Spacer(modifier = Modifier.height(16.dp))
 
             // User Interactive Rating
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = if (userRating != null) "Đánh giá của bạn: $userRating sao" else "Bạn đánh giá thế nào về phim này?",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
+            if (isUserLoggedIn) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    repeat(5) { index ->
-                        val ratingValue = index + 1
-                        val isSelected = userRating != null && ratingValue <= userRating
-                        val scale by animateFloatAsState(targetValue = if (isSelected) 1.2f else 1.0f, label = "star_scale")
-                        Icon(
-                            imageVector = if (isSelected) Icons.Default.Star else Icons.Default.StarBorder,
-                            contentDescription = "Rate $ratingValue Stars",
-                            tint = if (isSelected) Color(0xFFFFC107) else MaterialTheme.colorScheme.outline,
-                            modifier = Modifier
-                                .size(36.dp)
-                                .scale(scale)
-                                .clickable {
-                                    if (!isUserLoggedIn) {
-                                        onLoginRequired()
-                                    } else {
-                                        onRatingSubmit(ratingValue)
-                                    }
-                                }
-                                .padding(4.dp)
-                        )
+                    Text(
+                        text = if (userRating != null) "Đánh giá của bạn: $userRating sao" else "Bạn đánh giá thế nào về phim này?",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        repeat(5) { index ->
+                            val ratingValue = index + 1
+                            val isSelected = userRating != null && ratingValue <= userRating
+                            val scale by animateFloatAsState(targetValue = if (isSelected) 1.2f else 1.0f, label = "star_scale")
+                            Icon(
+                                imageVector = if (isSelected) Icons.Default.Star else Icons.Default.StarBorder,
+                                contentDescription = "Rate $ratingValue Stars",
+                                tint = if (isSelected) Color(0xFFFFC107) else MaterialTheme.colorScheme.outline,
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .scale(scale)
+                                    .clickable { onRatingSubmit(ratingValue) }
+                                    .padding(4.dp)
+                            )
+                        }
                     }
                 }
+            } else {
+                Text(
+                    text = "Đăng nhập để đánh giá phim",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                )
             }
         }
     }
