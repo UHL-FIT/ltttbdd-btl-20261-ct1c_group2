@@ -140,7 +140,10 @@ fun MainScreen(viewModel: MovieViewModel, authViewModel: AuthViewModel) {
                     onMovieClick = { movie -> 
                         navController.navigate("detail/${movie.id}")
                     },
-                    onLoginRequired = { navController.navigate("login") }
+                    onLoginRequired = { 
+                        authViewModel.clearError()
+                        navController.navigate("login") 
+                    }
                 ) 
             }
             composable(Screen.Search.route) { 
@@ -149,7 +152,10 @@ fun MainScreen(viewModel: MovieViewModel, authViewModel: AuthViewModel) {
                     onMovieClick = { movie ->
                         navController.navigate("detail/${movie.id}")
                     },
-                    onLoginRequired = { navController.navigate("login") }
+                    onLoginRequired = { 
+                        authViewModel.clearError()
+                        navController.navigate("login") 
+                    }
                 ) 
             }
             composable("search_history") { 
@@ -169,7 +175,10 @@ fun MainScreen(viewModel: MovieViewModel, authViewModel: AuthViewModel) {
                     onMovieClick = { movie -> 
                         navController.navigate("detail/${movie.id}")
                     },
-                    onLoginClick = { navController.navigate("login") }
+                    onLoginClick = { 
+                        authViewModel.clearError()
+                        navController.navigate("login") 
+                    }
                 ) 
             }
             composable(Screen.Profile.route) { 
@@ -179,9 +188,15 @@ fun MainScreen(viewModel: MovieViewModel, authViewModel: AuthViewModel) {
                     onLogout = {
                         navController.popBackStack()
                     },
-                    onNavigateToEditProfile = { navController.navigate("edit_profile") },
+                    onNavigateToEditProfile = { 
+                        authViewModel.clearError()
+                        navController.navigate("edit_profile") 
+                    },
                     onNavigateToWatchlist = { navController.navigate(Screen.Watchlist.route) },
-                    onLoginClick = { navController.navigate("login") },
+                    onLoginClick = { 
+                        authViewModel.clearError()
+                        navController.navigate("login") 
+                    },
                     onNavigateToSearch = {
                         navController.navigate(Screen.Search.route)
                     },
@@ -207,15 +222,26 @@ fun MainScreen(viewModel: MovieViewModel, authViewModel: AuthViewModel) {
                     movieId = movieId,
                     viewModel = viewModel,
                     onBackClick = { navController.popBackStack() },
-                    onLoginRequired = { navController.navigate("login") }
+                    onLoginRequired = { 
+                        authViewModel.clearError()
+                        navController.navigate("login") 
+                    }
                 )
             }
             // Tích hợp Login/Register vào đây
             composable("login") {
                 LoginScreen(
                     viewModel = authViewModel,
-                    onNavigateToRegister = { navController.navigate("register") },
+                    onNavigateToRegister = { 
+                        authViewModel.clearError()
+                        navController.navigate("register") 
+                    },
+                    onNavigateToForgotPassword = { 
+                        authViewModel.clearError()
+                        navController.navigate("forgot_password") 
+                    },
                     onLoginSuccess = { 
+                        authViewModel.clearError()
                         navController.popBackStack() 
                     }
                 )
@@ -223,10 +249,20 @@ fun MainScreen(viewModel: MovieViewModel, authViewModel: AuthViewModel) {
             composable("register") {
                 RegisterScreen(
                     viewModel = authViewModel,
-                    onNavigateToLogin = { navController.popBackStack() },
+                    onNavigateToLogin = { 
+                        authViewModel.clearError()
+                        navController.popBackStack() 
+                    },
                     onRegisterSuccess = { 
+                        authViewModel.clearError()
                         navController.popBackStack()
                     }
+                )
+            }
+            composable("forgot_password") {
+                ForgotPasswordScreen(
+                    viewModel = authViewModel,
+                    onNavigateBack = { navController.popBackStack() }
                 )
             }
         }

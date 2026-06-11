@@ -39,6 +39,11 @@ fun EditProfileScreen(
     var displayName by remember { mutableStateOf(user?.displayName ?: "") }
     var selectedImageUri by remember { mutableStateOf<Uri?>(user?.photoUrl) }
 
+    // Xóa lỗi cũ khi vào màn hình này
+    LaunchedEffect(Unit) {
+        viewModel.clearError()
+    }
+
     // Sync displayName when user data is available
     LaunchedEffect(user) {
         if (user == null) {

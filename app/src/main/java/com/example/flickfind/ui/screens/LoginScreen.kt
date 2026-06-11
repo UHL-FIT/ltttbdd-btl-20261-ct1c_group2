@@ -25,6 +25,7 @@ import com.example.flickfind.R
 fun LoginScreen(
     viewModel: AuthViewModel,
     onNavigateToRegister: () -> Unit,
+    onNavigateToForgotPassword: () -> Unit,
     onLoginSuccess: () -> Unit
 ) {
     var email by remember { mutableStateOf("") }
@@ -33,6 +34,11 @@ fun LoginScreen(
     val isLoading by viewModel.isLoading.collectAsState()
     val error by viewModel.error.collectAsState()
     val focusManager = LocalFocusManager.current
+
+    // Xóa lỗi cũ khi vào màn hình này
+    LaunchedEffect(Unit) {
+        viewModel.clearError()
+    }
 
     LaunchedEffect(user) {
         if (user != null) {
@@ -123,6 +129,10 @@ fun LoginScreen(
             } else {
                 Text("Đăng nhập")
             }
+        }
+
+        TextButton(onClick = onNavigateToForgotPassword) {
+            Text("Quên mật khẩu?")
         }
 
         TextButton(onClick = onNavigateToRegister) {

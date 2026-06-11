@@ -36,20 +36,16 @@ fun RegisterScreen(
     val registrationSuccess by viewModel.registrationSuccess.collectAsState()
     val focusManager = LocalFocusManager.current
 
-    if (registrationSuccess) {
-        AlertDialog(
-            onDismissRequest = { /* Không cho phép dismiss bằng cách nhấn ra ngoài */ },
-            title = { Text("Đăng ký thành công") },
-            text = { Text("Tài khoản của bạn đã được tạo. Vui lòng đăng nhập để tiếp tục.") },
-            confirmButton = {
-                Button(onClick = {
-                    viewModel.resetRegistrationSuccess()
-                    onNavigateToLogin()
-                }) {
-                    Text("Đồng ý")
-                }
-            }
-        )
+    // Xóa lỗi cũ khi vào màn hình này
+    LaunchedEffect(Unit) {
+        viewModel.clearError()
+    }
+
+    LaunchedEffect(registrationSuccess) {
+        if (registrationSuccess) {
+            viewModel.resetRegistrationSuccess()
+            onRegisterSuccess()
+        }
     }
 
     Column(
