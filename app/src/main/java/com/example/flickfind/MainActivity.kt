@@ -1,6 +1,7 @@
 package com.example.flickfind
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -35,8 +36,14 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
 class MainActivity : ComponentActivity() {
+    companion object {
+        private const val TAG = "Lifecycle"
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        Log.d(TAG, "onCreate")
 
         // Khởi tạo Retrofit
         // Ép buộc không sử dụng Gzip để tránh lỗi "gzip finished without exhausting source"
@@ -52,11 +59,13 @@ class MainActivity : ComponentActivity() {
                 chain.proceed(request)
             }
             .build()
+
         val retrofit = Retrofit.Builder()
             .baseUrl(TMDBApiService.BASE_URL)
             .client(client)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
+
         val apiService = retrofit.create(TMDBApiService::class.java)
 
         // Khởi tạo Database & Repositories
@@ -65,26 +74,52 @@ class MainActivity : ComponentActivity() {
         val authRepository = AuthRepository()
 
         enableEdgeToEdge()
+
         setContent {
             FlickFindTheme {
                 val movieViewModel: MovieViewModel = viewModel(
                     factory = MovieViewModelFactory(movieRepository)
                 )
+
                 val authViewModel: AuthViewModel = viewModel(
                     factory = AuthViewModelFactory(authRepository)
                 )
-                
+
                 val user by authViewModel.user.collectAsState()
 
                 LaunchedEffect(user?.uid) {
                     movieViewModel.loadWatchlistForUser(user?.uid)
-                    // Làm mới dữ liệu phim khi người dùng thay đổi (đăng nhập/đăng xuất)
                     movieViewModel.refreshAll()
                 }
 
                 MainScreen(movieViewModel, authViewModel)
             }
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        Log.d(TAG, "onStart")
+    }
+
+    override fun onResume() {
+        super.onResume()
+        Log.d(TAG, "onResume")
+    }
+
+    override fun onPause() {
+        super.onPause()
+        Log.d(TAG, "onPause")
+    }
+
+    override fun onStop() {
+        super.onStop()
+        Log.d(TAG, "onStop")
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        Log.d(TAG, "onDestroy")
     }
 }
 

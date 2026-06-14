@@ -202,8 +202,8 @@ fun CommentItem(
     comment: MovieComment,
     replies: List<MovieComment>,
     currentUserId: String?,
-    onLikeClick: () -> Unit,
-    onDeleteClick: () -> Unit,
+    onLikeClick: (String) -> Unit,
+    onDeleteClick: (String, String?) -> Unit,
     onReplySubmit: (String) -> Unit,
     onLoadReplies: () -> Unit,
     isUserLoggedIn: Boolean,
@@ -276,7 +276,7 @@ fun CommentItem(
                                 if (!isUserLoggedIn) {
                                     onLoginRequired()
                                 } else {
-                                    onLikeClick()
+                                    onLikeClick(comment.id)
                                 }
                             }
                             .padding(vertical = 4.dp, horizontal = 8.dp)
@@ -323,7 +323,7 @@ fun CommentItem(
                             tint = MaterialTheme.colorScheme.error,
                             modifier = Modifier
                                 .size(16.dp)
-                                .clickable { onDeleteClick() }
+                                .clickable { onDeleteClick(comment.id, comment.parentId) }
                         )
                     }
                 }
@@ -446,8 +446,7 @@ fun CommentItem(
                                                 if (!isUserLoggedIn) {
                                                     onLoginRequired()
                                                 } else {
-                                                    // Trigger reply like
-                                                    onLikeClick() // For simplicity in nested model, toggle comment's likes
+                                                    onLikeClick(reply.id)
                                                 }
                                             }
                                             .padding(vertical = 2.dp, horizontal = 4.dp)
@@ -473,7 +472,7 @@ fun CommentItem(
                                             tint = MaterialTheme.colorScheme.error,
                                             modifier = Modifier
                                                 .size(12.dp)
-                                                .clickable { onDeleteClick() }
+                                                .clickable { onDeleteClick(reply.id, reply.parentId) }
                                         )
                                     }
                                 }
