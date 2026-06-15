@@ -17,6 +17,10 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.ui.unit.dp
 import com.example.flickfind.ui.viewmodel.AuthViewModel
 import com.example.flickfind.R
@@ -34,6 +38,7 @@ fun LoginScreen(
     val isLoading by viewModel.isLoading.collectAsState()
     val error by viewModel.error.collectAsState()
     val focusManager = LocalFocusManager.current
+    var passwordVisible by remember { mutableStateOf(false) }
 
     // Xóa lỗi cũ khi vào màn hình này
     LaunchedEffect(Unit) {
@@ -90,7 +95,14 @@ fun LoginScreen(
             onValueChange = { password = it },
             label = { Text("Mật khẩu") },
             modifier = Modifier.fillMaxWidth(),
-            visualTransformation = PasswordVisualTransformation(),
+            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+            trailingIcon = {
+                val image = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
+                val description = if (passwordVisible) "Ẩn mật khẩu" else "Hiện mật khẩu"
+                IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                    Icon(imageVector = image, contentDescription = description)
+                }
+            },
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Password,
                 imeAction = ImeAction.Done

@@ -17,6 +17,12 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.flickfind.ui.viewmodel.AuthViewModel
 import com.example.flickfind.R
@@ -35,6 +41,9 @@ fun RegisterScreen(
     val error by viewModel.error.collectAsState()
     val registrationSuccess by viewModel.registrationSuccess.collectAsState()
     val focusManager = LocalFocusManager.current
+    val context = LocalContext.current
+    var passwordVisible by remember { mutableStateOf(false) }
+    var confirmPasswordVisible by remember { mutableStateOf(false) }
 
     // Xóa lỗi cũ khi vào màn hình này
     LaunchedEffect(Unit) {
@@ -44,7 +53,8 @@ fun RegisterScreen(
     LaunchedEffect(registrationSuccess) {
         if (registrationSuccess) {
             viewModel.resetRegistrationSuccess()
-            onRegisterSuccess()
+            Toast.makeText(context, "Đăng ký tài khoản thành công, mời đăng nhập lại", Toast.LENGTH_LONG).show()
+            onNavigateToLogin()
         }
     }
 
@@ -92,7 +102,14 @@ fun RegisterScreen(
             onValueChange = { password = it },
             label = { Text("Mật khẩu") },
             modifier = Modifier.fillMaxWidth(),
-            visualTransformation = PasswordVisualTransformation(),
+            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+            trailingIcon = {
+                val image = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
+                val description = if (passwordVisible) "Ẩn mật khẩu" else "Hiện mật khẩu"
+                IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                    Icon(imageVector = image, contentDescription = description)
+                }
+            },
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Password,
                 imeAction = ImeAction.Next
@@ -110,7 +127,14 @@ fun RegisterScreen(
             onValueChange = { confirmPassword = it },
             label = { Text("Xác nhận mật khẩu") },
             modifier = Modifier.fillMaxWidth(),
-            visualTransformation = PasswordVisualTransformation(),
+            visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+            trailingIcon = {
+                val image = if (confirmPasswordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
+                val description = if (confirmPasswordVisible) "Ẩn mật khẩu" else "Hiện mật khẩu"
+                IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {
+                    Icon(imageVector = image, contentDescription = description)
+                }
+            },
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Password,
                 imeAction = ImeAction.Done

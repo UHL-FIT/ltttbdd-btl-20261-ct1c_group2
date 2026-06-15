@@ -121,6 +121,7 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
         Log.d(TAG, "onDestroy")
     }
+
 }
 
 @Composable

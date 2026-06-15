@@ -91,7 +91,6 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
             _error.value = null
             repository.register(email, password)
                 .onSuccess {
-                    _user.value = it
                     _registrationSuccess.value = true
                 }
                 .onFailure {

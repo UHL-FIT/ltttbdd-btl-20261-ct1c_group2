@@ -77,6 +77,7 @@ class ReviewRepository {
             .whereEqualTo("movieId", movieId)
             .whereEqualTo("parentId", null)
             .addSnapshotListener { snapshot, error ->
+                android.util.Log.d("Performance", "UI nhận được bản cập nhật bình luận: ${System.currentTimeMillis()}")
                 if (error != null) {
                     Log.e("ReviewRepository", "getComments error", error)
                     return@addSnapshotListener
@@ -128,6 +129,7 @@ class ReviewRepository {
             replyCount = 0,
             createdAt = System.currentTimeMillis()
         )
+        android.util.Log.d("Performance", "Bắt đầu gửi bình luận: ${System.currentTimeMillis()}")
         commentRef.set(newComment).await()
     }
 

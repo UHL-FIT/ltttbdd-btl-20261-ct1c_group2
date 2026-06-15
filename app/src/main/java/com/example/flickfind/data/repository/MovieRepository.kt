@@ -32,15 +32,22 @@ class MovieRepository(
     private val auth = FirebaseAuth.getInstance()
 
     suspend fun getNowPlaying(): List<Movie> {
+        val startTime = System.currentTimeMillis()
         return try {
             val remoteMovies = apiService.getNowPlaying(apiKey, language).results
             // Cập nhật cache
             movieDao.clearCacheByCategory("now_playing")
             movieDao.insertCachedMovies(remoteMovies.map { it.toCachedEntity("now_playing") })
+            val endTime = System.currentTimeMillis()
+            android.util.Log.d("Performance", "Thời gian tải API (Now Playing): ${endTime - startTime} ms")
             remoteMovies
         } catch (e: Exception) {
             android.util.Log.e("MovieRepository", "Offline Mode: Fetching Now Playing from Cache", e)
-            movieDao.getCachedMovies("now_playing").map { it.toMovie() }
+            val cacheStartTime = System.currentTimeMillis()
+            val cachedResult = movieDao.getCachedMovies("now_playing").map { it.toMovie() }
+            val cacheEndTime = System.currentTimeMillis()
+            android.util.Log.d("Performance", "Thời gian đọc Cache (Now Playing): ${cacheEndTime - cacheStartTime} ms")
+            cachedResult
         }
     }
 
@@ -81,15 +88,22 @@ class MovieRepository(
             android.util.Log.e("MovieRepository", "Error cleaning old search cache", e)
         }
 
+        val startTime = System.currentTimeMillis()
         return try {
             val remoteMovies = apiService.searchMovies(apiKey, query, language).results
             // Cập nhật cache cho kết quả tìm kiếm
             movieDao.clearCacheByCategory(category)
             movieDao.insertCachedMovies(remoteMovies.map { it.toCachedEntity(category) })
+            val endTime = System.currentTimeMillis()
+            android.util.Log.d("Performance", "Thời gian tải API tìm kiếm cho '$query': ${endTime - startTime} ms")
             remoteMovies
         } catch (e: Exception) {
             android.util.Log.e("MovieRepository", "Offline Mode: Fetching Search Results for '$query' from Cache", e)
-            movieDao.getCachedMovies(category).map { it.toMovie() }
+            val cacheStartTime = System.currentTimeMillis()
+            val cachedResult = movieDao.getCachedMovies(category).map { it.toMovie() }
+            val cacheEndTime = System.currentTimeMillis()
+            android.util.Log.d("Performance", "Thời gian đọc Cache tìm kiếm: ${cacheEndTime - cacheStartTime} ms")
+            cachedResult
         }
     }
 
@@ -98,7 +112,11 @@ class MovieRepository(
     }
 
     suspend fun getMovieDetails(movieId: Int, lang: String = language): Movie {
-        return apiService.getMovieDetails(movieId, apiKey, lang)
+        val startTime = System.currentTimeMillis()
+        val result = apiService.getMovieDetails(movieId, apiKey, lang)
+        val endTime = System.currentTimeMillis()
+        android.util.Log.d("Performance", "Thời gian lấy chi tiết phim từ API: ${endTime - startTime} ms")
+        return result
     }
 
     suspend fun getMovieVideos(movieId: Int): List<Video> {
