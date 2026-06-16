@@ -174,7 +174,6 @@ class MovieRepository(
     }
 
 
-
     private fun scheduleReleaseNotification(movie: Movie) {
         val releaseDateStr = movie.releaseDate ?: return
         if (releaseDateStr.isBlank()) return
